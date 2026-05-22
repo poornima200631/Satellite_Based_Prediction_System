@@ -10,6 +10,8 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Try to import visualization libraries
 try:
+    import matplotlib
+    matplotlib.use('Agg')  # Force non-interactive Agg backend
     import matplotlib.pyplot as plt
     import seaborn as sns
     HAS_VIS = True
