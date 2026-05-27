@@ -91,7 +91,7 @@ print("Decision Tree Training Completed!")
 # predictions
 dt_predictions = dt_model.predict(X_test)
 
-# metrics
+
 dt_mae = mean_absolute_error(y_test, dt_predictions)
 dt_mse = mean_squared_error(y_test, dt_predictions)
 dt_rmse = np.sqrt(dt_mse)
