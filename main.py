@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import os
+import pickle
 
 # Set page configurations
 st.set_page_config(
@@ -108,6 +109,23 @@ st.markdown("""
         background-color: #2563eb !important;
         color: #ffffff !important;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    
+    /* Force label colors for visibility */
+    .stSelectbox label, .stSlider label, .stNumberInput label {
+        color: #f3f4f6 !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Prediction card styling */
+    .prediction-card-main {
+        background: rgba(17, 25, 40, 0.65);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 16px;
+        padding: 30px;
+        text-align: center;
+        margin-top: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -329,11 +347,12 @@ with m_col4:
 
 
 # ----------------- TABS SYSTEM -----------------
-tab_dist, tab_heatmap, tab_seasonal, tab_timeseries = st.tabs([
+tab_dist, tab_heatmap, tab_seasonal, tab_timeseries, tab_predict = st.tabs([
     "📊 Distributions (Histogram/Boxplots)",
     "🌡️ Correlation Heatmaps",
     "🍂 Seasonal & Monthly Trends",
-    "📈 Time-Series Graphs"
+    "📈 Time-Series Graphs",
+    "🤖 AI Prediction"
 ])
 
 # ==================== TAB 1: DISTRIBUTIONS ====================
@@ -662,6 +681,120 @@ with tab_timeseries:
             )
         )
         st.plotly_chart(fig_comp, use_container_width=True)
+
+# ==================== TAB 5: AI PREDICTION ====================
+with tab_predict:
+    st.markdown("### 🤖 Real-time PM2.5 AI Predictor")
+    st.write("Input meteorological and location data below to predict air quality using the Optimized Random Forest model.")
+    
+    @st.cache_resource
+    def load_ai_models():
+        try:
+            m = pickle.load(open("models/random_forest_optimized.pkl", "rb"))
+            s2 = pickle.load(open("models/rf_scaler.pkl", "rb"))
+            s1 = pickle.load(open("models/base_scaler.pkl", "rb"))
+            e = pickle.load(open("models/encoder.pkl", "rb"))
+            f = pickle.load(open("models/features.pkl", "rb"))
+            s_cols = pickle.load(open("models/scale_cols.pkl", "rb"))
+            return m, s2, s1, e, f, s_cols
+        except Exception:
+            return None, None, None, None, None, None
+            
+    model, rf_scaler, base_scaler, encoders, feature_list, scale_cols = load_ai_models()
+    
+    if model is None:
+        st.warning("⚠️ Prediction models not found. Please ensure Day 14 tasks (Save Models) were executed successfully.")
+    else:
+        state_enc = encoders['state']
+        loc_enc = encoders['location']
+        type_enc = encoders['type']
+        
+        with st.form("prediction_form"):
+            st.markdown("#### 📍 Location Details")
+            c1, c2, c3 = st.columns(3)
+            with c1: state_input = st.selectbox("State", sorted(list(state_enc.keys())))
+            with c2: loc_input = st.selectbox("Location", sorted(list(loc_enc.keys())))
+            with c3: type_input = st.selectbox("Area Type", sorted(list(type_enc.keys())))
+            
+            st.markdown("#### 🌦️ Meteorology & Pollutants")
+            c4, c5, c6 = st.columns(3)
+            with c4: temperature = st.slider("Temperature (°C)", -10.0, 50.0, 25.0)
+            with c5: humidity = st.slider("Humidity (%)", 0.0, 100.0, 50.0)
+            with c6: windspeed = st.slider("Windspeed (m/s)", 0.0, 20.0, 5.0)
+            
+            c7, c8, c9 = st.columns(3)
+            with c7: so2 = st.slider("SO2 (µg/m³)", 0.0, 100.0, 10.0)
+            with c8: no2 = st.slider("NO2 (µg/m³)", 0.0, 150.0, 20.0)
+            with c9: rspm = st.slider("RSPM (µg/m³)", 0.0, 500.0, 50.0)
+            
+            st.markdown("#### ⏳ Historical PM2.5 Data")
+            st.write("The AI model heavily relies on recent pollution trends.")
+            recent_pm25 = st.slider("Recent Average PM2.5 (Last 1-7 days)", 0.0, 500.0, 50.0)
+            
+            with st.expander("⚙️ Advanced Features (Auto-filled)"):
+                st.write("These defaults represent typical baseline mean values.")
+                ca, cb, cc = st.columns(3)
+                with ca: month_in = st.number_input("Month", min_value=1, max_value=12, value=6)
+                with cb: pressure = st.number_input("Pressure", value=1000.0)
+                with cc: aqi = st.number_input("AQI", value=100.0)
+            
+            submit_btn = st.form_submit_button("🚀 Predict PM2.5", use_container_width=True)
+            
+        if submit_btn:
+            input_data = {col: 0.0 for col in feature_list}
+            input_data['state'] = state_enc.get(state_input, 0)
+            input_data['location'] = loc_enc.get(loc_input, 0)
+            input_data['type'] = type_enc.get(type_input, 0)
+            
+            season_map = {12:1, 1:1, 2:1, 3:2, 4:2, 5:2, 6:3, 7:3, 8:3, 9:4, 10:4, 11:4}
+            input_data['season'] = season_map.get(month_in, 3)
+            input_data['year'] = 2024
+            input_data['month'] = month_in
+            input_data['day'] = 15
+            
+            input_data['temperature'] = temperature
+            input_data['humidity'] = humidity
+            input_data['windspeed'] = windspeed
+            input_data['so2'] = so2
+            input_data['no2'] = no2
+            input_data['rspm'] = rspm
+            input_data['pressure'] = pressure
+            input_data['airqualityindex'] = aqi
+            
+            # Map recent PM2.5 to time-series lag/rolling features
+            input_data['pm2_5_lag1'] = recent_pm25
+            input_data['pm2_5_lag2'] = recent_pm25
+            input_data['pm2_5_roll3'] = recent_pm25
+            input_data['pm2_5_roll7'] = recent_pm25
+            
+            df_input = pd.DataFrame([input_data])[feature_list]
+            
+            # 1. Apply base_scaler to continuous variables (fixes raw input distribution)
+            df_input[scale_cols] = base_scaler.transform(df_input[scale_cols])
+            
+            # 2. Apply rf_scaler to all features (matches final training state)
+            scaled_input = rf_scaler.transform(df_input)
+            
+            prediction = model.predict(scaled_input)[0]
+            
+            if prediction <= 30:
+                status, color, icon = "Good", "#10b981", "🟢"
+            elif prediction <= 60:
+                status, color, icon = "Moderate", "#f59e0b", "🟡"
+            elif prediction <= 90:
+                status, color, icon = "Poor", "#ef4444", "🔴"
+            else:
+                status, color, icon = "Severe", "#991b1b", "☠️"
+                
+            st.markdown(f"""
+            <div class="prediction-card-main">
+                <div style="font-size: 14px; color: #9ca3af; text-transform: uppercase;">Estimated PM2.5 Level</div>
+                <div style="font-size: 54px; font-weight: 800; color: #ffffff;">{prediction:.2f} µg/m³</div>
+                <div style="font-size: 20px; font-weight: bold; color: {color}; margin-top: 10px;">
+                    {icon} {status} Air Quality
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 # ----------------- FOOTER -----------------
 st.markdown("<hr style='border-color: rgba(255,255,255,0.05); margin: 40px 0 20px 0;'>", unsafe_allow_html=True)
