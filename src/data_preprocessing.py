@@ -2,8 +2,11 @@ import pandas as pd
 import numpy as np
 import os
 from sklearn.preprocessing import StandardScaler
+import pickle
 
 DATA_PATH = os.path.join('data', 'processed')
+MODELS_PATH = 'models'
+os.makedirs(MODELS_PATH, exist_ok=True)
 
 
 # =========================
@@ -152,12 +155,20 @@ def clean_combined_data(df):
 
     df[scale_cols] = scaler.fit_transform(df[scale_cols])
 
+    # Save the base scaler for deployment
+    with open(os.path.join(MODELS_PATH, 'base_scaler.pkl'), 'wb') as f:
+        pickle.dump(scaler, f)
+    
+    # Save the list of columns that were scaled so we know what to transform in app.py
+    with open(os.path.join(MODELS_PATH, 'scale_cols.pkl'), 'wb') as f:
+        pickle.dump(scale_cols, f)
+
     output_path = os.path.join(DATA_PATH, 'model_ready_data.csv')
 
     df.to_csv(output_path, index=False)
 
     print(f"Final shape: {df.shape}")
-    print("Model-ready dataset saved.")
+    print("Model-ready dataset and base scaler saved.")
 
     return df
 
