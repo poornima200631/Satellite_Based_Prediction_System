@@ -690,17 +690,19 @@ with tab_predict:
     @st.cache_resource
     def load_ai_models():
         try:
-            m = pickle.load(open("models/random_forest_optimized.pkl", "rb"))
-            s2 = pickle.load(open("models/rf_scaler.pkl", "rb"))
-            s1 = pickle.load(open("models/base_scaler.pkl", "rb"))
-            e = pickle.load(open("models/encoder.pkl", "rb"))
-            f = pickle.load(open("models/features.pkl", "rb"))
+            import joblib
+            m = joblib.load("models/xgboost_tuned.pkl")
+            s_tuned = joblib.load("models/scaler_tuned.pkl")
+            s_base = pickle.load(open("models/base_scaler.pkl", "rb"))
             s_cols = pickle.load(open("models/scale_cols.pkl", "rb"))
-            return m, s2, s1, e, f, s_cols
-        except Exception:
+            e = pickle.load(open("models/encoder.pkl", "rb"))
+            feature_list = list(s_tuned.feature_names_in_)
+            return m, s_tuned, s_base, s_cols, e, feature_list
+        except Exception as e:
+            st.error(str(e))
             return None, None, None, None, None, None
             
-    model, rf_scaler, base_scaler, encoders, feature_list, scale_cols = load_ai_models()
+    model, scaler_tuned, base_scaler, scale_cols, encoders, feature_list = load_ai_models()
     
     if model is None:
         st.warning("⚠️ Prediction models not found. Please ensure Day 14 tasks (Save Models) were executed successfully.")
@@ -747,34 +749,36 @@ with tab_predict:
             input_data['type'] = type_enc.get(type_input, 0)
             
             season_map = {12:1, 1:1, 2:1, 3:2, 4:2, 5:2, 6:3, 7:3, 8:3, 9:4, 10:4, 11:4}
-            input_data['season'] = season_map.get(month_in, 3)
-            input_data['year'] = 2024
-            input_data['month'] = month_in
-            input_data['day'] = 15
+            if 'season' in input_data: input_data['season'] = season_map.get(month_in, 3)
+            if 'year' in input_data: input_data['year'] = 2024
+            if 'month' in input_data: input_data['month'] = month_in
+            if 'day' in input_data: input_data['day'] = 15
             
-            input_data['temperature'] = temperature
-            input_data['humidity'] = humidity
-            input_data['windspeed'] = windspeed
-            input_data['so2'] = so2
-            input_data['no2'] = no2
-            input_data['rspm'] = rspm
-            input_data['pressure'] = pressure
-            input_data['airqualityindex'] = aqi
+            if 'temperature' in input_data: input_data['temperature'] = temperature
+            if 'humidity' in input_data: input_data['humidity'] = humidity
+            if 'windspeed' in input_data: input_data['windspeed'] = windspeed
+            if 'so2' in input_data: input_data['so2'] = so2
+            if 'no2' in input_data: input_data['no2'] = no2
+            if 'rspm' in input_data: input_data['rspm'] = rspm
+            if 'pressure' in input_data: input_data['pressure'] = pressure
+            if 'airqualityindex' in input_data: input_data['airqualityindex'] = aqi
             
             # Map recent PM2.5 to time-series lag/rolling features
-            input_data['pm2_5_lag1'] = recent_pm25
-            input_data['pm2_5_lag2'] = recent_pm25
-            input_data['pm2_5_roll3'] = recent_pm25
-            input_data['pm2_5_roll7'] = recent_pm25
+            if 'pm2_5_lag1' in input_data: input_data['pm2_5_lag1'] = recent_pm25
+            if 'pm2_5_lag2' in input_data: input_data['pm2_5_lag2'] = recent_pm25
+            if 'pm2_5_roll3' in input_data: input_data['pm2_5_roll3'] = recent_pm25
+            if 'pm2_5_roll7' in input_data: input_data['pm2_5_roll7'] = recent_pm25
+            if 'temp_lag1' in input_data: input_data['temp_lag1'] = temperature
             
             df_input = pd.DataFrame([input_data])[feature_list]
             
             # 1. Apply base_scaler to continuous variables (fixes raw input distribution)
             df_input[scale_cols] = base_scaler.transform(df_input[scale_cols])
             
-            # 2. Apply rf_scaler to all features (matches final training state)
-            scaled_input = rf_scaler.transform(df_input)
+            # 2. Scale all features using tuned scaler
+            scaled_input = scaler_tuned.transform(df_input)
             
+            # Predict using Tuned XGBoost model
             prediction = model.predict(scaled_input)[0]
             
             if prediction <= 30:
