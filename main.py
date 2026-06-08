@@ -10,6 +10,7 @@ import pickle
 
 model = joblib.load("models/xgboost_model.pkl")
 features = joblib.load("models/features.pkl")
+
 # Set page configurations
 st.set_page_config(
     page_title="Satellite-Based Air Quality & Meteorological Insights",
@@ -210,18 +211,22 @@ def load_cleaned_data():
     return None
 
 
-def predict_pm25(input_dict):
-    input_df = pd.DataFrame([input_dict])
+def predict_pm25(input_data):
+    # create dataframe in correct feature order
+    df = pd.DataFrame([input_data])
 
-    for col in features:
-        if col not in input_df.columns:
-            input_df[col] = 0
+    # force exact feature order
+    df = df.reindex(columns=feature_list)
 
-    input_df = input_df[features]
+    # fill missing values
+    df = df.fillna(0)
 
-    prediction = model.predict(input_df)
+    # scaling pipeline (SAME as training)
+    df[scale_cols] = base_scaler.transform(df[scale_cols])
+    df = scaler_tuned.transform(df)
 
-    return prediction[0]
+    # predict
+    return model.predict(df)[0]
 # Load datasets
 combined_df = load_combined_data()
 cleaned_df = load_cleaned_data()
@@ -698,8 +703,6 @@ with tab_timeseries:
                 x=1
             )
         )
-        st.plotly_chart(fig_comp, use_container_width=True)
-
 # ==================== TAB 5: AI PREDICTION ====================
 with tab_predict:
     st.markdown("### 🤖 Real-time PM2.5 AI Predictor")
@@ -828,54 +831,54 @@ st.markdown("""
 
 st.divider()
 
-st.header("🔮 PM2.5 Prediction")
-st.write("Enter parameters and click Predict")
+# st.header("🔮 PM2.5 Prediction")
+# st.write("Enter parameters and click Predict")
 
-col1, col2 = st.columns(2)
+# col1, col2 = st.columns(2)
 
-with col1:
-    state = st.number_input("State Code", value=2)
-    location = st.number_input("Location Code", value=22)
-    area_type = st.number_input("Area Type Code", value=0)
+# with col1:
+#     state = st.number_input("State Code", value=2)
+#     location = st.number_input("Location Code", value=22)
+#     area_type = st.number_input("Area Type Code", value=0)
 
-    so2 = st.number_input("SO2", value=15.0)
-    no2 = st.number_input("NO2", value=40.0)
-    rspm = st.number_input("RSPM", value=50.0)
+#     so2 = st.number_input("SO2", value=15.0)
+#     no2 = st.number_input("NO2", value=40.0)
+#     rspm = st.number_input("RSPM", value=50.0)
 
-    year = st.number_input("Year", value=2024)
-    month = st.number_input("Month", value=6)
-    day = st.number_input("Day", value=15)
+#     year = st.number_input("Year", value=2024)
+#     month = st.number_input("Month", value=6)
+#     day = st.number_input("Day", value=15)
 
-with col2:
-    temperature = st.number_input("Temperature", value=30.0)
-    humidity = st.number_input("Humidity", value=70.0)
-    pressure = st.number_input("Pressure", value=1013.0)
+# with col2:
+#     temperature = st.number_input("Temperature", value=30.0)
+#     humidity = st.number_input("Humidity", value=70.0)
+#     pressure = st.number_input("Pressure", value=1013.0)
 
-    windspeed = st.number_input("Wind Speed", value=5.0)
-    winddirection = st.number_input("Wind Direction", value=180.0)
+#     windspeed = st.number_input("Wind Speed", value=5.0)
+#     pm10 = st.number_input("PM10", value=50.0)
+#     winddirection = st.number_input("Wind Direction", value=0.0)
 
-    pm10 = st.number_input("PM10", value=80.0)
+# if st.button("Predict PM2.5"):
 
-if st.button("Predict PM2.5"):
+#     input_data = {
+#         "state": state,
+#         "location": location,
+#         "type": area_type,
+#         "so2": so2,
+#         "no2": no2,
+#         "rspm": rspm,
+#         "year": year,
+#         "month": month,
+#         "day": day,
+#         "pm10": pm10,
+#         "temperature": temperature,
+#         "humidity": humidity,
+#         "pressure": pressure,
+#         "windspeed": windspeed,
+#         "winddirection": winddirection
+#     }
 
-    input_data = {
-        "state": state,
-        "location": location,
-        "type": area_type,
-        "so2": so2,
-        "no2": no2,
-        "rspm": rspm,
-        "year": year,
-        "month": month,
-        "day": day,
-        "pm10": pm10,
-        "temperature": temperature,
-        "humidity": humidity,
-        "pressure": pressure,
-        "windspeed": windspeed,
-        "winddirection": winddirection
-    }
+#     prediction = predict_pm25(input_data)
 
-    prediction = predict_pm25(input_data)
-
-    st.success(f"Predicted PM2.5 = {prediction:.2f} µg/m³")
+# st.write("MODEL FEATURES COUNT:", len(features))
+# st.write(features)
