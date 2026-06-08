@@ -1,13 +1,14 @@
+import joblib
 import pickle
 import pandas as pd
 import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
-model = pickle.load(open("models/random_forest_optimized.pkl", "rb"))
-scaler = pickle.load(open("models/rf_scaler.pkl", "rb"))
+model = joblib.load("models/xgboost_tuned.pkl")
+scaler = joblib.load("models/scaler_tuned.pkl")
 encoders = pickle.load(open("models/encoder.pkl", "rb"))
-feature_list = pickle.load(open("models/features.pkl", "rb"))
+feature_list = list(scaler.feature_names_in_)
 
 # Create base input
 base_input = {col: 0.0 for col in feature_list}
