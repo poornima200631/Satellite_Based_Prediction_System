@@ -7,6 +7,7 @@ import os
 import joblib
 import pickle
 
+
 model = joblib.load("models/xgboost_model.pkl")
 features = joblib.load("models/features.pkl")
 # Set page configurations
