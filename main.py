@@ -191,7 +191,7 @@ def decode_df(df):
 # Cached data loaders
 @st.cache_data
 def load_combined_data():
-    path = os.path.join('data', 'processed', 'cleaned_combined_dataset.csv')
+    path = os.path.join('data', 'processed', 'model_ready_data_satellite.csv')
     if os.path.exists(path):
         df = pd.read_csv(path)
         df['date'] = pd.to_datetime(df['date'])
