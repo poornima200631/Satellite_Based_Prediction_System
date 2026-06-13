@@ -15,7 +15,7 @@ from xgboost import XGBRegressor
 # ==============================
 # 1. Load dataset
 # ==============================
-df = pd.read_csv("data/processed/model_ready_data.csv")
+df = pd.read_csv("data/processed/model_ready_data_satellite.csv")
 
 # ==============================
 # 2. Clean dataset
@@ -65,7 +65,7 @@ print("RMSE:", np.sqrt(mean_squared_error(y_test, baseline_pred)))
 print("R2 Score:", r2_score(y_test, baseline_pred))
 
 # ==============================
-# 6. XGBoost Model (Tuned)
+# 6. XGBoost Model (Tuned with Satellite Data)
 # ==============================
 model = XGBRegressor(
     n_estimators=180,
@@ -103,7 +103,7 @@ print("R2 Score:", r2)
 importance = pd.DataFrame({
     'Feature': X.columns,
     'Importance': model.feature_importances_
-}).sort_values(by='Importance', ascending=False)
+}).sort_values('Importance', ascending=False)
 
 print("\nTop Features:")
 print(importance.head(10))
@@ -112,7 +112,7 @@ plt.figure(figsize=(10,6))
 plt.barh(importance['Feature'][:10], importance['Importance'][:10])
 plt.gca().invert_yaxis()
 plt.title("Feature Importance")
-plt.show()
+# plt.show()
 
 # ==============================
 # 10. Residual Plot
@@ -124,7 +124,7 @@ plt.hist(residuals, bins=50)
 plt.title("Residual Distribution")
 plt.xlabel("Error")
 plt.ylabel("Frequency")
-plt.show()
+# plt.show()
 
 # ==============================
 # 11. Save model + features
@@ -133,8 +133,8 @@ plt.show()
 # ==============================
 import joblib
 
-joblib.dump(model, "models/xgboost_model.pkl")
-joblib.dump(scaler, "models/scaler_tuned.pkl")
+joblib.dump(model, "models/xgboost_satellite.pkl")
+joblib.dump(scaler, "models/scaler_satellite.pkl")
 print("\nModel saved successfully!")
 
 def predict_pm25(input_dict):
