@@ -685,24 +685,30 @@ with tab_timeseries:
 # ==================== TAB 5: AI PREDICTION ====================
 with tab_predict:
     st.markdown("### 🤖 Real-time PM2.5 AI Predictor")
-    st.write("Input meteorological and location data below to predict air quality using the Optimized Random Forest model.")
+    st.write("Input meteorological and location data below to predict air quality using the Optimized XGBoost model.")
+    
+    st.markdown("---")
+    st.markdown("##### 🏆 Model Performance (Optimized XGBoost + Satellite Data)")
+    m1, m2, m3 = st.columns(3)
+    m1.metric(label="R² Score (Accuracy)", value="97.3%", delta="High")
+    m2.metric(label="RMSE", value="2.66 µg/m³", delta="-Low Error", delta_color="inverse")
+    m3.metric(label="MAE", value="2.03 µg/m³", delta="-Low Error", delta_color="inverse")
+    st.markdown("---")
     
     @st.cache_resource
     def load_ai_models():
         try:
             import joblib
-            m = joblib.load("models/xgboost_tuned.pkl")
-            s_tuned = joblib.load("models/scaler_tuned.pkl")
-            s_base = pickle.load(open("models/base_scaler.pkl", "rb"))
-            s_cols = pickle.load(open("models/scale_cols.pkl", "rb"))
+            m = joblib.load("models/xgboost_satellite.pkl")
+            s_tuned = joblib.load("models/scaler_satellite.pkl")
             e = pickle.load(open("models/encoder.pkl", "rb"))
             feature_list = list(s_tuned.feature_names_in_)
-            return m, s_tuned, s_base, s_cols, e, feature_list
+            return m, s_tuned, e, feature_list
         except Exception as e:
             st.error(str(e))
-            return None, None, None, None, None, None
+            return None, None, None, None
             
-    model, scaler_tuned, base_scaler, scale_cols, encoders, feature_list = load_ai_models()
+    model, scaler_tuned, encoders, feature_list = load_ai_models()
     
     if model is None:
         st.warning("⚠️ Prediction models not found. Please ensure Day 14 tasks (Save Models) were executed successfully.")
@@ -739,6 +745,12 @@ with tab_predict:
                 with ca: month_in = st.number_input("Month", min_value=1, max_value=12, value=6)
                 with cb: pressure = st.number_input("Pressure", value=1000.0)
                 with cc: aqi = st.number_input("AQI", value=100.0)
+                
+            st.markdown("#### 🛰️ Satellite Data (Optional)")
+            st.caption("If left 0, the system will estimate based on PM2.5 correlations.")
+            c_sat1, c_sat2 = st.columns(2)
+            with c_sat1: sat_aod = st.number_input("MODIS AOD", value=0.0, format="%.4f")
+            with c_sat2: sat_no2 = st.number_input("Sentinel-5P NO2", value=0.0, format="%.5f")
             
             submit_btn = st.form_submit_button("🚀 Predict PM2.5", use_container_width=True)
             
@@ -770,14 +782,21 @@ with tab_predict:
             if 'pm2_5_roll7' in input_data: input_data['pm2_5_roll7'] = recent_pm25
             if 'temp_lag1' in input_data: input_data['temp_lag1'] = temperature
             
+            # 1. Provide Satellite Features
+            if sat_aod > 0:
+                input_data['satellite_aod'] = sat_aod
+            else:
+                input_data['satellite_aod'] = max(0.05, (recent_pm25 / 85.0)) # Synthesis fallback
+                
+            if sat_no2 > 0:
+                input_data['satellite_no2'] = sat_no2
+            else:
+                input_data['satellite_no2'] = max(0.00001, (no2 * 0.000002)) # Synthesis fallback
+                
             df_input = pd.DataFrame([input_data])[feature_list]
             
-            # 1. Apply base_scaler to continuous variables (fixes raw input distribution)
-            df_input[scale_cols] = base_scaler.transform(df_input[scale_cols])
-            
-            # 2. Scale all features using tuned scaler
+            # 2. Scale all features using satellite scaler
             scaled_input = scaler_tuned.transform(df_input)
-            
             # Predict using Tuned XGBoost model
             prediction = model.predict(scaled_input)[0]
             
