@@ -1,5 +1,7 @@
+
 # 🌍 AeroSatellite Predict
 **Air Quality Forecasting Using Spatial Satellite & Weather Intelligence**
+
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.57-FF4B4B?logo=streamlit)
@@ -104,7 +106,9 @@ Satellite_Based_Prediction_System/
 - **Automated Pipelines:** Schedule Apache Airflow DAGs for 24/7 autonomous satellite extraction.
 - **Healthcare Integration:** Develop open APIs for medical institutions to trigger asthma alerts based on our satellite-predicted PM2.5 levels.
 
+
 <br>
 <p align="center">
   <b>Built with ❤️ for a cleaner, breathable future.</b>
 </p>
+

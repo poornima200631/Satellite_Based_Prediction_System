@@ -4,12 +4,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import os
-import joblib
-import pickle
-
-
-model = joblib.load("models/xgboost_model.pkl")
-features = joblib.load("models/features.pkl")
 
 # Set page configurations
 st.set_page_config(
@@ -115,23 +109,6 @@ st.markdown("""
         color: #ffffff !important;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
     }
-    
-    /* Force label colors for visibility */
-    .stSelectbox label, .stSlider label, .stNumberInput label {
-        color: #f3f4f6 !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Prediction card styling */
-    .prediction-card-main {
-        background: rgba(17, 25, 40, 0.65);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        border-radius: 16px;
-        padding: 30px;
-        text-align: center;
-        margin-top: 20px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -191,7 +168,7 @@ def decode_df(df):
 # Cached data loaders
 @st.cache_data
 def load_combined_data():
-    path = os.path.join('data', 'processed', 'model_ready_data_satellite.csv')
+    path = os.path.join('data', 'processed', 'cleaned_combined_dataset.csv')
     if os.path.exists(path):
         df = pd.read_csv(path)
         df['date'] = pd.to_datetime(df['date'])
@@ -210,23 +187,6 @@ def load_cleaned_data():
         return decode_df(df)
     return None
 
-
-def predict_pm25(input_data):
-    # create dataframe in correct feature order
-    df = pd.DataFrame([input_data])
-
-    # force exact feature order
-    df = df.reindex(columns=feature_list)
-
-    # fill missing values
-    df = df.fillna(0)
-
-    # scaling pipeline (SAME as training)
-    df[scale_cols] = base_scaler.transform(df[scale_cols])
-    df = scaler_tuned.transform(df)
-
-    # predict
-    return model.predict(df)[0]
 # Load datasets
 combined_df = load_combined_data()
 cleaned_df = load_cleaned_data()
@@ -369,12 +329,11 @@ with m_col4:
 
 
 # ----------------- TABS SYSTEM -----------------
-tab_dist, tab_heatmap, tab_seasonal, tab_timeseries, tab_predict = st.tabs([
+tab_dist, tab_heatmap, tab_seasonal, tab_timeseries = st.tabs([
     "📊 Distributions (Histogram/Boxplots)",
     "🌡️ Correlation Heatmaps",
     "🍂 Seasonal & Monthly Trends",
-    "📈 Time-Series Graphs",
-    "🤖 AI Prediction"
+    "📈 Time-Series Graphs"
 ])
 
 # ==================== TAB 1: DISTRIBUTIONS ====================
@@ -655,7 +614,6 @@ with tab_timeseries:
         yaxis=dict(gridcolor="rgba(255,255,255,0.05)")
     )
     st.plotly_chart(fig_ts, use_container_width=True)
-    
 
     # Multi-variable time-series comparison
     st.markdown("#### Compare Multiple Variables Over Time")
@@ -703,142 +661,7 @@ with tab_timeseries:
                 x=1
             )
         )
-# ==================== TAB 5: AI PREDICTION ====================
-with tab_predict:
-    st.markdown("### 🤖 Real-time PM2.5 AI Predictor")
-    st.write("Input meteorological and location data below to predict air quality using the Optimized XGBoost model.")
-    
-    st.markdown("---")
-    st.markdown("##### 🏆 Model Performance (Optimized XGBoost + Satellite Data)")
-    m1, m2, m3 = st.columns(3)
-    m1.metric(label="R² Score (Accuracy)", value="97.3%", delta="High")
-    m2.metric(label="RMSE", value="2.66 µg/m³", delta="-Low Error", delta_color="inverse")
-    m3.metric(label="MAE", value="2.03 µg/m³", delta="-Low Error", delta_color="inverse")
-    st.markdown("---")
-    
-    @st.cache_resource
-    def load_ai_models():
-        try:
-            import joblib
-            m = joblib.load("models/xgboost_satellite.pkl")
-            s_tuned = joblib.load("models/scaler_satellite.pkl")
-            e = pickle.load(open("models/encoder.pkl", "rb"))
-            feature_list = list(s_tuned.feature_names_in_)
-            return m, s_tuned, e, feature_list
-        except Exception as e:
-            st.error(str(e))
-            return None, None, None, None
-            
-    model, scaler_tuned, encoders, feature_list = load_ai_models()
-    
-    if model is None:
-        st.warning("⚠️ Prediction models not found. Please ensure Day 14 tasks (Save Models) were executed successfully.")
-    else:
-        state_enc = encoders['state']
-        loc_enc = encoders['location']
-        type_enc = encoders['type']
-        
-        with st.form("prediction_form"):
-            st.markdown("#### 📍 Location Details")
-            c1, c2, c3 = st.columns(3)
-            with c1: state_input = st.selectbox("State", sorted(list(state_enc.keys())))
-            with c2: loc_input = st.selectbox("Location", sorted(list(loc_enc.keys())))
-            with c3: type_input = st.selectbox("Area Type", sorted(list(type_enc.keys())))
-            
-            st.markdown("#### 🌦️ Meteorology & Pollutants")
-            c4, c5, c6 = st.columns(3)
-            with c4: temperature = st.slider("Temperature (°C)", -10.0, 50.0, 25.0)
-            with c5: humidity = st.slider("Humidity (%)", 0.0, 100.0, 50.0)
-            with c6: windspeed = st.slider("Windspeed (m/s)", 0.0, 20.0, 5.0)
-            
-            c7, c8, c9 = st.columns(3)
-            with c7: so2 = st.slider("SO2 (µg/m³)", 0.0, 100.0, 10.0)
-            with c8: no2 = st.slider("NO2 (µg/m³)", 0.0, 150.0, 20.0)
-            with c9: rspm = st.slider("RSPM (µg/m³)", 0.0, 500.0, 50.0)
-            
-            st.markdown("#### ⏳ Historical PM2.5 Data")
-            st.write("The AI model heavily relies on recent pollution trends.")
-            recent_pm25 = st.slider("Recent Average PM2.5 (Last 1-7 days)", 0.0, 500.0, 50.0)
-            
-            with st.expander("⚙️ Advanced Features (Auto-filled)"):
-                st.write("These defaults represent typical baseline mean values.")
-                ca, cb, cc = st.columns(3)
-                with ca: month_in = st.number_input("Month", min_value=1, max_value=12, value=6)
-                with cb: pressure = st.number_input("Pressure", value=1000.0)
-                with cc: aqi = st.number_input("AQI", value=100.0)
-                
-            st.markdown("#### 🛰️ Satellite Data (Optional)")
-            st.caption("If left 0, the system will estimate based on PM2.5 correlations.")
-            c_sat1, c_sat2 = st.columns(2)
-            with c_sat1: sat_aod = st.number_input("MODIS AOD", value=0.0, format="%.4f")
-            with c_sat2: sat_no2 = st.number_input("Sentinel-5P NO2", value=0.0, format="%.5f")
-            
-            submit_btn = st.form_submit_button("🚀 Predict PM2.5", use_container_width=True)
-            
-        if submit_btn:
-            input_data = {col: 0.0 for col in feature_list}
-            input_data['state'] = state_enc.get(state_input, 0)
-            input_data['location'] = loc_enc.get(loc_input, 0)
-            input_data['type'] = type_enc.get(type_input, 0)
-            
-            season_map = {12:1, 1:1, 2:1, 3:2, 4:2, 5:2, 6:3, 7:3, 8:3, 9:4, 10:4, 11:4}
-            if 'season' in input_data: input_data['season'] = season_map.get(month_in, 3)
-            if 'year' in input_data: input_data['year'] = 2024
-            if 'month' in input_data: input_data['month'] = month_in
-            if 'day' in input_data: input_data['day'] = 15
-            
-            if 'temperature' in input_data: input_data['temperature'] = temperature
-            if 'humidity' in input_data: input_data['humidity'] = humidity
-            if 'windspeed' in input_data: input_data['windspeed'] = windspeed
-            if 'so2' in input_data: input_data['so2'] = so2
-            if 'no2' in input_data: input_data['no2'] = no2
-            if 'rspm' in input_data: input_data['rspm'] = rspm
-            if 'pressure' in input_data: input_data['pressure'] = pressure
-            if 'airqualityindex' in input_data: input_data['airqualityindex'] = aqi
-            
-            # Map recent PM2.5 to time-series lag/rolling features
-            if 'pm2_5_lag1' in input_data: input_data['pm2_5_lag1'] = recent_pm25
-            if 'pm2_5_lag2' in input_data: input_data['pm2_5_lag2'] = recent_pm25
-            if 'pm2_5_roll3' in input_data: input_data['pm2_5_roll3'] = recent_pm25
-            if 'pm2_5_roll7' in input_data: input_data['pm2_5_roll7'] = recent_pm25
-            if 'temp_lag1' in input_data: input_data['temp_lag1'] = temperature
-            
-            # 1. Provide Satellite Features
-            if sat_aod > 0:
-                input_data['satellite_aod'] = sat_aod
-            else:
-                input_data['satellite_aod'] = max(0.05, (recent_pm25 / 85.0)) # Synthesis fallback
-                
-            if sat_no2 > 0:
-                input_data['satellite_no2'] = sat_no2
-            else:
-                input_data['satellite_no2'] = max(0.00001, (no2 * 0.000002)) # Synthesis fallback
-                
-            df_input = pd.DataFrame([input_data])[feature_list]
-            
-            # 2. Scale all features using satellite scaler
-            scaled_input = scaler_tuned.transform(df_input)
-            # Predict using Tuned XGBoost model
-            prediction = model.predict(scaled_input)[0]
-            
-            if prediction <= 30:
-                status, color, icon = "Good", "#10b981", "🟢"
-            elif prediction <= 60:
-                status, color, icon = "Moderate", "#f59e0b", "🟡"
-            elif prediction <= 90:
-                status, color, icon = "Poor", "#ef4444", "🔴"
-            else:
-                status, color, icon = "Severe", "#991b1b", "☠️"
-                
-            st.markdown(f"""
-            <div class="prediction-card-main">
-                <div style="font-size: 14px; color: #9ca3af; text-transform: uppercase;">Estimated PM2.5 Level</div>
-                <div style="font-size: 54px; font-weight: 800; color: #ffffff;">{prediction:.2f} µg/m³</div>
-                <div style="font-size: 20px; font-weight: bold; color: {color}; margin-top: 10px;">
-                    {icon} {status} Air Quality
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+        st.plotly_chart(fig_comp, use_container_width=True)
 
 # ----------------- FOOTER -----------------
 st.markdown("<hr style='border-color: rgba(255,255,255,0.05); margin: 40px 0 20px 0;'>", unsafe_allow_html=True)
@@ -847,57 +670,3 @@ st.markdown("""
     🌍 Satellite-Based Air Quality Prediction System | Developed in Python with Streamlit and Plotly | Local time: 2026
 </div>
 """, unsafe_allow_html=True)
-
-st.divider()
-
-# st.header("🔮 PM2.5 Prediction")
-# st.write("Enter parameters and click Predict")
-
-# col1, col2 = st.columns(2)
-
-# with col1:
-#     state = st.number_input("State Code", value=2)
-#     location = st.number_input("Location Code", value=22)
-#     area_type = st.number_input("Area Type Code", value=0)
-
-#     so2 = st.number_input("SO2", value=15.0)
-#     no2 = st.number_input("NO2", value=40.0)
-#     rspm = st.number_input("RSPM", value=50.0)
-
-#     year = st.number_input("Year", value=2024)
-#     month = st.number_input("Month", value=6)
-#     day = st.number_input("Day", value=15)
-
-# with col2:
-#     temperature = st.number_input("Temperature", value=30.0)
-#     humidity = st.number_input("Humidity", value=70.0)
-#     pressure = st.number_input("Pressure", value=1013.0)
-
-#     windspeed = st.number_input("Wind Speed", value=5.0)
-#     pm10 = st.number_input("PM10", value=50.0)
-#     winddirection = st.number_input("Wind Direction", value=0.0)
-
-# if st.button("Predict PM2.5"):
-
-#     input_data = {
-#         "state": state,
-#         "location": location,
-#         "type": area_type,
-#         "so2": so2,
-#         "no2": no2,
-#         "rspm": rspm,
-#         "year": year,
-#         "month": month,
-#         "day": day,
-#         "pm10": pm10,
-#         "temperature": temperature,
-#         "humidity": humidity,
-#         "pressure": pressure,
-#         "windspeed": windspeed,
-#         "winddirection": winddirection
-#     }
-
-#     prediction = predict_pm25(input_data)
-
-# st.write("MODEL FEATURES COUNT:", len(features))
-# st.write(features)
