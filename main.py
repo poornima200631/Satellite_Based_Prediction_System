@@ -462,7 +462,6 @@ with tab_heatmap:
             text_auto=".2f",
             aspect="auto",
             color_continuous_scale="RdBu_r",  # Red for positive correlation, Blue for negative
-            range_color=[-1, 1],
             title="Interactive Feature Correlation Matrix",
             template="plotly_dark"
         )
