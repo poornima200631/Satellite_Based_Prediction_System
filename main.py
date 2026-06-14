@@ -655,26 +655,17 @@ with tab_timeseries:
             
         fig_comp = go.Figure()
         for idx, var in enumerate(compare_vars):
-            # Normalize to 0-1 range so trends are visible together
-            var_min = comp_df[var].min()
-            var_max = comp_df[var].max()
-            if var_max > var_min:
-                norm_y = (comp_df[var] - var_min) / (var_max - var_min)
-            else:
-                norm_y = comp_df[var]
-
             fig_comp.add_trace(go.Scatter(
                 x=comp_df['date'],
-                y=norm_y,
+                y=comp_df[var],
                 name=var.upper(),
                 mode='lines',
-                line=dict(width=2),
-                hovertemplate='%{x}<br>Normalized Value: %{y:.2f}'
+                line=dict(width=2)
             ))
             
         fig_comp.update_layout(
             template="plotly_dark",
-            title=f"Multi-Variable Trend Comparison (Normalized 0-1 Scale)",
+            title=f"Multi-Variable Comparison Timeline ({resample_choice})",
             xaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
             yaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
             plot_bgcolor="rgba(0,0,0,0)",
