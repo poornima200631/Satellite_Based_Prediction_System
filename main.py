@@ -4,7 +4,12 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import os
+import joblib
 import pickle
+
+
+model = joblib.load("models/xgboost_model.pkl")
+features = joblib.load("models/features.pkl")
 
 # Set page configurations
 st.set_page_config(
@@ -206,6 +211,22 @@ def load_cleaned_data():
     return None
 
 
+def predict_pm25(input_data):
+    # create dataframe in correct feature order
+    df = pd.DataFrame([input_data])
+
+    # force exact feature order
+    df = df.reindex(columns=feature_list)
+
+    # fill missing values
+    df = df.fillna(0)
+
+    # scaling pipeline (SAME as training)
+    df[scale_cols] = base_scaler.transform(df[scale_cols])
+    df = scaler_tuned.transform(df)
+
+    # predict
+    return model.predict(df)[0]
 # Load datasets
 combined_df = load_combined_data()
 cleaned_df = load_cleaned_data()
@@ -828,3 +849,55 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.divider()
+
+# st.header("🔮 PM2.5 Prediction")
+# st.write("Enter parameters and click Predict")
+
+# col1, col2 = st.columns(2)
+
+# with col1:
+#     state = st.number_input("State Code", value=2)
+#     location = st.number_input("Location Code", value=22)
+#     area_type = st.number_input("Area Type Code", value=0)
+
+#     so2 = st.number_input("SO2", value=15.0)
+#     no2 = st.number_input("NO2", value=40.0)
+#     rspm = st.number_input("RSPM", value=50.0)
+
+#     year = st.number_input("Year", value=2024)
+#     month = st.number_input("Month", value=6)
+#     day = st.number_input("Day", value=15)
+
+# with col2:
+#     temperature = st.number_input("Temperature", value=30.0)
+#     humidity = st.number_input("Humidity", value=70.0)
+#     pressure = st.number_input("Pressure", value=1013.0)
+
+#     windspeed = st.number_input("Wind Speed", value=5.0)
+#     pm10 = st.number_input("PM10", value=50.0)
+#     winddirection = st.number_input("Wind Direction", value=0.0)
+
+# if st.button("Predict PM2.5"):
+
+#     input_data = {
+#         "state": state,
+#         "location": location,
+#         "type": area_type,
+#         "so2": so2,
+#         "no2": no2,
+#         "rspm": rspm,
+#         "year": year,
+#         "month": month,
+#         "day": day,
+#         "pm10": pm10,
+#         "temperature": temperature,
+#         "humidity": humidity,
+#         "pressure": pressure,
+#         "windspeed": windspeed,
+#         "winddirection": winddirection
+#     }
+
+#     prediction = predict_pm25(input_data)
+
+# st.write("MODEL FEATURES COUNT:", len(features))
+# st.write(features)
