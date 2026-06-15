@@ -4,12 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import os
-import joblib
 import pickle
-
-
-model = joblib.load("models/xgboost_model.pkl")
-features = joblib.load("models/features.pkl")
 
 # Set page configurations
 st.set_page_config(
@@ -211,22 +206,6 @@ def load_cleaned_data():
     return None
 
 
-def predict_pm25(input_data):
-    # create dataframe in correct feature order
-    df = pd.DataFrame([input_data])
-
-    # force exact feature order
-    df = df.reindex(columns=feature_list)
-
-    # fill missing values
-    df = df.fillna(0)
-
-    # scaling pipeline (SAME as training)
-    df[scale_cols] = base_scaler.transform(df[scale_cols])
-    df = scaler_tuned.transform(df)
-
-    # predict
-    return model.predict(df)[0]
 # Load datasets
 combined_df = load_combined_data()
 cleaned_df = load_cleaned_data()
@@ -483,7 +462,6 @@ with tab_heatmap:
             text_auto=".2f",
             aspect="auto",
             color_continuous_scale="RdBu_r",  # Red for positive correlation, Blue for negative
-            range_color=[-1, 1],
             title="Interactive Feature Correlation Matrix",
             template="plotly_dark"
         )
@@ -677,17 +655,26 @@ with tab_timeseries:
             
         fig_comp = go.Figure()
         for idx, var in enumerate(compare_vars):
+            # Normalize to 0-1 range so trends are visible together
+            var_min = comp_df[var].min()
+            var_max = comp_df[var].max()
+            if var_max > var_min:
+                norm_y = (comp_df[var] - var_min) / (var_max - var_min)
+            else:
+                norm_y = comp_df[var]
+
             fig_comp.add_trace(go.Scatter(
                 x=comp_df['date'],
-                y=comp_df[var],
+                y=norm_y,
                 name=var.upper(),
                 mode='lines',
-                line=dict(width=2)
+                line=dict(width=2),
+                hovertemplate='%{x}<br>Normalized Value: %{y:.2f}'
             ))
             
         fig_comp.update_layout(
             template="plotly_dark",
-            title=f"Multi-Variable Comparison Timeline ({resample_choice})",
+            title=f"Multi-Variable Trend Comparison (Normalized 0-1 Scale)",
             xaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
             yaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
             plot_bgcolor="rgba(0,0,0,0)",
@@ -703,6 +690,8 @@ with tab_timeseries:
                 x=1
             )
         )
+        st.plotly_chart(fig_comp, use_container_width=True)
+
 # ==================== TAB 5: AI PREDICTION ====================
 with tab_predict:
     st.markdown("### 🤖 Real-time PM2.5 AI Predictor")
@@ -849,55 +838,3 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.divider()
-
-# st.header("🔮 PM2.5 Prediction")
-# st.write("Enter parameters and click Predict")
-
-# col1, col2 = st.columns(2)
-
-# with col1:
-#     state = st.number_input("State Code", value=2)
-#     location = st.number_input("Location Code", value=22)
-#     area_type = st.number_input("Area Type Code", value=0)
-
-#     so2 = st.number_input("SO2", value=15.0)
-#     no2 = st.number_input("NO2", value=40.0)
-#     rspm = st.number_input("RSPM", value=50.0)
-
-#     year = st.number_input("Year", value=2024)
-#     month = st.number_input("Month", value=6)
-#     day = st.number_input("Day", value=15)
-
-# with col2:
-#     temperature = st.number_input("Temperature", value=30.0)
-#     humidity = st.number_input("Humidity", value=70.0)
-#     pressure = st.number_input("Pressure", value=1013.0)
-
-#     windspeed = st.number_input("Wind Speed", value=5.0)
-#     pm10 = st.number_input("PM10", value=50.0)
-#     winddirection = st.number_input("Wind Direction", value=0.0)
-
-# if st.button("Predict PM2.5"):
-
-#     input_data = {
-#         "state": state,
-#         "location": location,
-#         "type": area_type,
-#         "so2": so2,
-#         "no2": no2,
-#         "rspm": rspm,
-#         "year": year,
-#         "month": month,
-#         "day": day,
-#         "pm10": pm10,
-#         "temperature": temperature,
-#         "humidity": humidity,
-#         "pressure": pressure,
-#         "windspeed": windspeed,
-#         "winddirection": winddirection
-#     }
-
-#     prediction = predict_pm25(input_data)
-
-# st.write("MODEL FEATURES COUNT:", len(features))
-# st.write(features)
