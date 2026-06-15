@@ -681,6 +681,8 @@ with tab_timeseries:
                 x=1
             )
         )
+        st.plotly_chart(fig_comp, use_container_width=True)
+
 # ==================== TAB 5: AI PREDICTION ====================
 with tab_predict:
     st.markdown("### 🤖 Real-time PM2.5 AI Predictor")
