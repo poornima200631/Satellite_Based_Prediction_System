@@ -5,6 +5,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 import pickle
+import requests
+import json
 
 # Set page configurations
 st.set_page_config(
@@ -284,77 +286,84 @@ if filtered_df.empty:
     st.warning("⚠️ No data matches the selected filters. Please expand your filter criteria in the sidebar.")
     st.stop()
 
-# ----------------- OVERVIEW METRICS -----------------
-m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+if not filtered_df.empty:
+    # ----------------- OVERVIEW METRICS -----------------
+    m_col1, m_col2, m_col3, m_col4 = st.columns(4)
 
-with m_col1:
-    avg_pm25 = filtered_df['pm2_5'].mean()
-    pm25_status = "Good" if avg_pm25 <= 30 else "Moderate" if avg_pm25 <= 60 else "Poor"
-    pm25_color = "#10b981" if avg_pm25 <= 30 else "#f59e0b" if avg_pm25 <= 60 else "#ef4444"
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">Average PM2.5</div>
-        <div class="metric-value">{avg_pm25:.2f} µg/m³</div>
-        <div class="metric-sub" style="color: {pm25_color}; font-weight: bold;">
-            ● {pm25_status} Air Quality
+    with m_col1:
+        avg_pm25 = filtered_df['pm2_5'].mean()
+        pm25_status = "Good" if avg_pm25 <= 30 else "Moderate" if avg_pm25 <= 60 else "Poor"
+        pm25_color = "#10b981" if avg_pm25 <= 30 else "#f59e0b" if avg_pm25 <= 60 else "#ef4444"
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Average PM2.5</div>
+            <div class="metric-value">{avg_pm25:.2f} µg/m³</div>
+            <div class="metric-sub" style="color: {pm25_color}; font-weight: bold;">
+                ● {pm25_status} Air Quality
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-with m_col2:
-    max_pm25 = filtered_df['pm2_5'].max()
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">Peak PM2.5 Level</div>
-        <div class="metric-value">{max_pm25:.2f} µg/m³</div>
-        <div class="metric-sub" style="color: #ef4444;">
-            ⚠ Maximum Recorded
+    with m_col2:
+        max_pm25 = filtered_df['pm2_5'].max()
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Peak PM2.5 Level</div>
+            <div class="metric-value">{max_pm25:.2f} µg/m³</div>
+            <div class="metric-sub" style="color: #ef4444;">
+                ⚠ Maximum Recorded
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-with m_col3:
-    if 'temperature' in filtered_df.columns:
-        avg_temp = filtered_df['temperature'].mean()
-        # If it was scaled (mean=0, std=1), show scaled note, otherwise standard
-        is_scaled = abs(avg_temp) < 2.0 and filtered_df['temperature'].std() < 1.5
-        temp_val = f"{avg_temp:.2f}" + (" (Std)" if is_scaled else " °C")
-        sub_txt = "Standardized Scale" if is_scaled else "Ambient Temperature"
-    else:
-        temp_val = "N/A"
-        sub_txt = "Weather features not in dataset"
-        
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">Mean Temperature</div>
-        <div class="metric-value">{temp_val}</div>
-        <div class="metric-sub" style="color: #60a5fa;">
-            ❄ {sub_txt}
+    with m_col3:
+        if 'temperature' in filtered_df.columns:
+            avg_temp = filtered_df['temperature'].mean()
+            # If it was scaled (mean=0, std=1), show scaled note, otherwise standard
+            is_scaled = abs(avg_temp) < 2.0 and filtered_df['temperature'].std() < 1.5
+            temp_val = f"{avg_temp:.2f}" + (" (Std)" if is_scaled else " °C")
+            sub_txt = "Standardized Scale" if is_scaled else "Ambient Temperature"
+        else:
+            temp_val = "N/A"
+            sub_txt = "Weather features not in dataset"
+            
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Mean Temperature</div>
+            <div class="metric-value">{temp_val}</div>
+            <div class="metric-sub" style="color: #60a5fa;">
+                ❄ {sub_txt}
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-with m_col4:
-    total_records = len(filtered_df)
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">Total Observations</div>
-        <div class="metric-value">{total_records:,}</div>
-        <div class="metric-sub" style="color: #10b981;">
-            ✓ Active Datapoints
+    with m_col4:
+        total_records = len(filtered_df)
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Total Observations</div>
+            <div class="metric-value">{total_records:,}</div>
+            <div class="metric-sub" style="color: #10b981;">
+                ✓ Active Datapoints
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
 
 # ----------------- TABS SYSTEM -----------------
 tab_dist, tab_heatmap, tab_seasonal, tab_timeseries, tab_predict = st.tabs([
     "📊 Distributions (Histogram/Boxplots)",
     "🌡️ Correlation Heatmaps",
-    "🍂 Seasonal & Monthly Trends",
-    "📈 Time-Series Graphs",
+    "🍂 Seasonal Trends",
+    "📈 Time-Series",
     "🤖 AI Prediction"
 ])
+
+
+# Stop if empty for data explorer tabs
+if filtered_df.empty:
+    st.warning("⚠️ No data matches the selected filters for the Data Explorer tabs. Please adjust the sidebar. Control Center is still active.")
+    st.stop()
 
 # ==================== TAB 1: DISTRIBUTIONS ====================
 with tab_dist:
@@ -692,11 +701,13 @@ with tab_timeseries:
         )
         st.plotly_chart(fig_comp, use_container_width=True)
 
+
+
 # ==================== TAB 5: AI PREDICTION ====================
 with tab_predict:
     st.markdown("### 🤖 Real-time PM2.5 AI Predictor")
     st.write("Input meteorological and location data below to predict air quality using the Optimized XGBoost model.")
-    
+
     st.markdown("---")
     st.markdown("##### 🏆 Model Performance (Optimized XGBoost + Satellite Data)")
     m1, m2, m3 = st.columns(3)
@@ -704,7 +715,7 @@ with tab_predict:
     m2.metric(label="RMSE", value="2.66 µg/m³", delta="-Low Error", delta_color="inverse")
     m3.metric(label="MAE", value="2.03 µg/m³", delta="-Low Error", delta_color="inverse")
     st.markdown("---")
-    
+
     @st.cache_resource
     def load_ai_models():
         try:
@@ -719,7 +730,7 @@ with tab_predict:
             return None, None, None, None
             
     model, scaler_tuned, encoders, feature_list = load_ai_models()
-    
+
     if model is None:
         st.warning("⚠️ Prediction models not found. Please ensure Day 14 tasks (Save Models) were executed successfully.")
     else:
@@ -727,48 +738,161 @@ with tab_predict:
         loc_enc = encoders['location']
         type_enc = encoders['type']
         
+        st.markdown("#### 📍 Global Location Search")
+        search_query = st.text_input("Enter City, Village, or Region Name (e.g., Jaisalmer, Rajasthan)", value="Delhi, India")
+        forecast_mode = st.radio("Select Timeframe", ["🔴 Live Data (Today)", "🔵 Forecast (Tomorrow)"], horizontal=True)
+        
+        if st.button("🔍 Auto-Fetch Environmental Data", use_container_width=True):
+            if search_query:
+                st.info(f"Searching coordinates and fetching data for: {search_query}...")
+                try:
+                    headers = {'User-Agent': 'AeroSatellitePredict/1.0'}
+                    geo_url = f"https://nominatim.openstreetmap.org/search?q={search_query}&format=json&limit=1"
+                    geo_res = requests.get(geo_url, headers=headers).json()
+                    
+                    lat, lon, resolved_name = None, None, None
+                    if len(geo_res) > 0:
+                        lat = float(geo_res[0]['lat'])
+                        lon = float(geo_res[0]['lon'])
+                        resolved_name = geo_res[0].get('display_name', search_query)
+                    else:
+                        geo_om_url = f"https://geocoding-api.open-meteo.com/v1/search?name={search_query}&count=1&language=en&format=json"
+                        geo_om_res = requests.get(geo_om_url).json()
+                        if 'results' in geo_om_res and len(geo_om_res['results']) > 0:
+                            lat = float(geo_om_res['results'][0]['latitude'])
+                            lon = float(geo_om_res['results'][0]['longitude'])
+                            resolved_name = f"{geo_om_res['results'][0]['name']}, {geo_om_res['results'][0].get('admin1', '')}, {geo_om_res['results'][0].get('country', '')}"
+                            
+                    if lat is not None and lon is not None:
+                        is_tomorrow = "Tomorrow" in forecast_mode
+                        
+                        if not is_tomorrow:
+                            w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m"
+                            a_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}&current=pm10,pm2_5,nitrogen_dioxide,sulphur_dioxide,aerosol_optical_depth"
+                            st.session_state['trend_title'] = "📉 6-Day PM2.5 History (Past Trend)"
+                        else:
+                            w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min,wind_speed_10m_max&forecast_days=2"
+                            a_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}&hourly=pm10,pm2_5,nitrogen_dioxide,sulphur_dioxide,aerosol_optical_depth&forecast_days=2"
+                            st.session_state['trend_title'] = "📈 6-Day PM2.5 Forecast (Future Trend)"
+                        
+                        import time
+                        max_retries = 3
+                        w_res, a_res = None, None
+                        for attempt in range(max_retries):
+                            try:
+                                import concurrent.futures
+                                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                                    f_w = executor.submit(requests.get, w_url, timeout=7)
+                                    f_a = executor.submit(requests.get, a_url, timeout=7)
+                                    w_res = f_w.result().json()
+                                    a_res = f_a.result().json()
+                                break
+                            except requests.exceptions.RequestException as req_e:
+                                if attempt == max_retries - 1:
+                                    raise req_e
+                                time.sleep(1)
+                                
+                        if w_res and a_res:
+                            if not is_tomorrow:
+                                current_w = w_res.get('current', {})
+                                current_a = a_res.get('current', {})
+                                
+                                if current_w.get('temperature_2m') is not None: st.session_state['temp'] = float(current_w['temperature_2m'])
+                                if current_w.get('relative_humidity_2m') is not None: st.session_state['hum'] = float(current_w['relative_humidity_2m'])
+                                if current_w.get('wind_speed_10m') is not None: st.session_state['wind'] = float(current_w['wind_speed_10m'])
+                                if current_w.get('surface_pressure') is not None: st.session_state['press'] = float(current_w['surface_pressure'])
+                                
+                                if current_a.get('pm2_5') is not None: st.session_state['pm25'] = float(current_a['pm2_5'])
+                                if current_a.get('nitrogen_dioxide') is not None: st.session_state['no2'] = float(current_a['nitrogen_dioxide'])
+                                if current_a.get('sulphur_dioxide') is not None: st.session_state['so2'] = float(current_a['sulphur_dioxide'])
+                                if current_a.get('pm10') is not None: st.session_state['rspm'] = float(current_a['pm10'])
+                                if current_a.get('aerosol_optical_depth') is not None: st.session_state['aod'] = float(current_a['aerosol_optical_depth'])
+                            else:
+                                daily_w = w_res.get('daily', {})
+                                hourly_a = a_res.get('hourly', {})
+                                
+                                if 'temperature_2m_max' in daily_w and len(daily_w['temperature_2m_max']) > 1:
+                                    t_max = daily_w['temperature_2m_max'][1]
+                                    t_min = daily_w['temperature_2m_min'][1]
+                                    if t_max is not None and t_min is not None:
+                                        st.session_state['temp'] = (t_max + t_min) / 2.0
+                                if 'wind_speed_10m_max' in daily_w and len(daily_w['wind_speed_10m_max']) > 1:
+                                    if daily_w['wind_speed_10m_max'][1] is not None:
+                                        st.session_state['wind'] = float(daily_w['wind_speed_10m_max'][1])
+                                
+                                def get_avg_tomorrow(arr):
+                                    if arr is not None and len(arr) >= 48:
+                                        vals = [x for x in arr[24:48] if x is not None]
+                                        return sum(vals)/len(vals) if vals else None
+                                    return None
+                                
+                                avg_pm25 = get_avg_tomorrow(hourly_a.get('pm2_5'))
+                                if avg_pm25 is not None: st.session_state['pm25'] = float(avg_pm25)
+                                avg_no2 = get_avg_tomorrow(hourly_a.get('nitrogen_dioxide'))
+                                if avg_no2 is not None: st.session_state['no2'] = float(avg_no2)
+                                avg_so2 = get_avg_tomorrow(hourly_a.get('sulphur_dioxide'))
+                                if avg_so2 is not None: st.session_state['so2'] = float(avg_so2)
+                                avg_pm10 = get_avg_tomorrow(hourly_a.get('pm10'))
+                                if avg_pm10 is not None: st.session_state['rspm'] = float(avg_pm10)
+                                avg_aod = get_avg_tomorrow(hourly_a.get('aerosol_optical_depth'))
+                                if avg_aod is not None: st.session_state['aod'] = float(avg_aod)
+                                
+                            st.session_state['fetched_lat'] = lat
+                            st.session_state['fetched_lon'] = lon
+                            
+                            
+
+                            st.success(f"Data successfully loaded for {resolved_name}! Sliders have been updated.")
+                    else:
+                        st.warning("Location not found. Try checking the spelling.")
+                except Exception as e:
+                    st.error(f"Failed to fetch data: {e}")
+
+        if 'fetched_lat' in st.session_state and 'fetched_lon' in st.session_state:
+            st.markdown("---")
+            st.markdown("#### 🌍 Target Location Map")
+            import plotly.express as px
+            map_df = pd.DataFrame({'lat': [st.session_state['fetched_lat']], 'lon': [st.session_state['fetched_lon']], 'size': [1]})
+            fig_map = px.scatter_mapbox(map_df, lat="lat", lon="lon", size="size", zoom=9, mapbox_style="open-street-map")
+            fig_map.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+            fig_map.update_traces(marker=dict(color='red', size=15))
+            st.plotly_chart(fig_map, use_container_width=True)
+            st.markdown("---")
+
         with st.form("prediction_form"):
-            st.markdown("#### 📍 Location Details")
-            c1, c2, c3 = st.columns(3)
-            with c1: state_input = st.selectbox("State", sorted(list(state_enc.keys())))
-            with c2: loc_input = st.selectbox("Location", sorted(list(loc_enc.keys())))
-            with c3: type_input = st.selectbox("Area Type", sorted(list(type_enc.keys())))
-            
             st.markdown("#### 🌦️ Meteorology & Pollutants")
             c4, c5, c6 = st.columns(3)
-            with c4: temperature = st.slider("Temperature (°C)", -10.0, 50.0, 25.0)
-            with c5: humidity = st.slider("Humidity (%)", 0.0, 100.0, 50.0)
-            with c6: windspeed = st.slider("Windspeed (m/s)", 0.0, 20.0, 5.0)
+            with c4: temperature = st.slider("Temperature (°C)", -10.0, 50.0, st.session_state.get('temp', 25.0))
+            with c5: humidity = st.slider("Humidity (%)", 0.0, 100.0, st.session_state.get('hum', 50.0))
+            with c6: windspeed = st.slider("Windspeed (m/s)", 0.0, 20.0, st.session_state.get('wind', 5.0))
             
             c7, c8, c9 = st.columns(3)
-            with c7: so2 = st.slider("SO2 (µg/m³)", 0.0, 100.0, 10.0)
-            with c8: no2 = st.slider("NO2 (µg/m³)", 0.0, 150.0, 20.0)
-            with c9: rspm = st.slider("RSPM (µg/m³)", 0.0, 500.0, 50.0)
+            with c7: so2 = st.slider("SO2 (µg/m³)", 0.0, 100.0, st.session_state.get('so2', 10.0))
+            with c8: no2 = st.slider("NO2 (µg/m³)", 0.0, 150.0, st.session_state.get('no2', 20.0))
+            with c9: rspm = st.slider("RSPM (µg/m³)", 0.0, 500.0, st.session_state.get('rspm', 50.0))
             
             st.markdown("#### ⏳ Historical PM2.5 Data")
             st.write("The AI model heavily relies on recent pollution trends.")
-            recent_pm25 = st.slider("Recent Average PM2.5 (Last 1-7 days)", 0.0, 500.0, 50.0)
+            recent_pm25 = st.slider("Recent Average PM2.5 (Last 1-7 days)", 0.0, 500.0, st.session_state.get('pm25', 50.0))
             
             with st.expander("⚙️ Advanced Features (Auto-filled)"):
                 st.write("These defaults represent typical baseline mean values.")
                 ca, cb, cc = st.columns(3)
                 with ca: month_in = st.number_input("Month", min_value=1, max_value=12, value=6)
-                with cb: pressure = st.number_input("Pressure", value=1000.0)
+                with cb: pressure = st.number_input("Pressure", value=st.session_state.get('press', 1000.0))
                 with cc: aqi = st.number_input("AQI", value=100.0)
                 
             st.markdown("#### 🛰️ Satellite Data (Optional)")
             st.caption("If left 0, the system will estimate based on PM2.5 correlations.")
             c_sat1, c_sat2 = st.columns(2)
-            with c_sat1: sat_aod = st.number_input("MODIS AOD", value=0.0, format="%.4f")
+            with c_sat1: sat_aod = st.number_input("MODIS AOD", value=st.session_state.get('aod', 0.0), format="%.4f")
             with c_sat2: sat_no2 = st.number_input("Sentinel-5P NO2", value=0.0, format="%.5f")
             
             submit_btn = st.form_submit_button("🚀 Predict PM2.5", use_container_width=True)
             
         if submit_btn:
+
             input_data = {col: 0.0 for col in feature_list}
-            input_data['state'] = state_enc.get(state_input, 0)
-            input_data['location'] = loc_enc.get(loc_input, 0)
-            input_data['type'] = type_enc.get(type_input, 0)
             
             season_map = {12:1, 1:1, 2:1, 3:2, 4:2, 5:2, 6:3, 7:3, 8:3, 9:4, 10:4, 11:4}
             if 'season' in input_data: input_data['season'] = season_map.get(month_in, 3)
@@ -829,12 +953,13 @@ with tab_predict:
             </div>
             """, unsafe_allow_html=True)
 
-# ----------------- FOOTER -----------------
-st.markdown("<hr style='border-color: rgba(255,255,255,0.05); margin: 40px 0 20px 0;'>", unsafe_allow_html=True)
-st.markdown("""
-<div style="text-align: center; color: #6b7280; font-size: 12px; padding-bottom: 20px;">
+    # ----------------- FOOTER -----------------
+    st.markdown("<hr style='border-color: rgba(255,255,255,0.05); margin: 40px 0 20px 0;'>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; color: #6b7280; font-size: 12px; padding-bottom: 20px;">
     🌍 Satellite-Based Air Quality Prediction System | Developed in Python with Streamlit and Plotly | Local time: 2026
-</div>
-""", unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
-st.divider()
+    st.divider()
+
